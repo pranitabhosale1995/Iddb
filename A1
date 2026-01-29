@@ -1,0 +1,79 @@
+import React from 'react';
+import { Box, Typography, Grid, Paper } from '@mui/material';
+import { useNavigate } from 'react-router-dom';
+import HistoryIcon from '@mui/icons-material/History';
+import DateRangeIcon from '@mui/icons-material/DateRange';
+import AssessmentIcon from '@mui/icons-material/Assessment';
+
+const BalanceCompareDifferenceScreen = () => {
+    const navigate = useNavigate();
+
+    const options = [
+        { 
+            id: 'particular', 
+            title: 'Particular Search', 
+            icon: <HistoryIcon sx={{ fontSize: 45, color: '#3b82f6' }} />, 
+            path: '/balance-compare/particular',
+            desc: 'Search by specific report date'
+        },
+        { 
+            id: 'range', 
+            title: 'Range Search', 
+            icon: <DateRangeIcon sx={{ fontSize: 45, color: '#8b5cf6' }} />, 
+            path: '/balance-compare/range',
+            desc: 'Search within a date range'
+        },
+        { 
+            id: 'current', 
+            title: 'Current Search', 
+            icon: <AssessmentIcon sx={{ fontSize: 45, color: '#10b981' }} />, 
+            path: '/balance-compare/current',
+            desc: 'View current balance details'
+        }
+    ];
+
+    return (
+        <Box sx={{ p: 5, textAlign: 'center', bgcolor: '#f8fafd', minHeight: '100vh' }}>
+            <Typography variant="h4" sx={{ fontWeight: 800, mb: 1, color: '#1e293b' }}>
+                Balance Compare Difference
+            </Typography>
+            <Typography variant="body1" color="textSecondary" sx={{ mb: 6 }}>
+                Please select a search criteria to proceed
+            </Typography>
+
+            <Grid container spacing={4} justifyContent="center">
+                {options.map((option) => (
+                    <Grid item key={option.id}>
+                        <Paper
+                            elevation={0}
+                            onClick={() => navigate(option.path)}
+                            sx={{
+                                p: 5,
+                                width: 280,
+                                borderRadius: '24px',
+                                border: '1px solid #e2e8f0',
+                                cursor: 'pointer',
+                                transition: 'all 0.3s ease-in-out',
+                                '&:hover': { 
+                                    transform: 'translateY(-12px)', 
+                                    boxShadow: '0 20px 25px -5px rgba(0,0,0,0.1), 0 10px 10px -5px rgba(0,0,0,0.04)',
+                                    borderColor: '#3b82f6'
+                                }
+                            }}
+                        >
+                            <Box sx={{ mb: 3 }}>{option.icon}</Box>
+                            <Typography variant="h6" sx={{ fontWeight: 700, mb: 1 }}>
+                                {option.title}
+                            </Typography>
+                            <Typography variant="body2" color="textSecondary">
+                                {option.desc}
+                            </Typography>
+                        </Paper>
+                    </Grid>
+                ))}
+            </Grid>
+        </Box>
+    );
+};
+
+export default BalanceCompareDifferenceScreen;
