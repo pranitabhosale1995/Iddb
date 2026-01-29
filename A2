@@ -1,0 +1,130 @@
+import React from 'react';
+import { Box, Typography, Grid, Paper, Stack, Container } from '@mui/material';
+import { useNavigate } from 'react-router-dom';
+import HistoryIcon from '@mui/icons-material/History'; // Particular
+import DateRangeIcon from '@mui/icons-material/DateRange'; // Range
+import AssessmentIcon from '@mui/icons-material/Assessment'; // Current
+import ChevronRightIcon from '@mui/icons-material/ChevronRight';
+import InfoOutlinedIcon from '@mui/icons-material/InfoOutlined';
+
+const BalanceCompareDifferenceScreen = () => {
+    const navigate = useNavigate();
+
+    const options = [
+        { 
+            id: 'particular', 
+            title: 'Particular Search', 
+            desc: 'To View details of specific report date', 
+            icon: <HistoryIcon sx={{ fontSize: 24, color: '#1e293b' }} />, 
+            path: '/balance-compare/particular' 
+        },
+        { 
+            id: 'range', 
+            title: 'Range Search', 
+            desc: 'To efficiently review and process the details between date range', 
+            icon: <DateRangeIcon sx={{ fontSize: 24, color: '#1e293b' }} />, 
+            path: '/balance-compare/range' 
+        },
+        { 
+            id: 'current', 
+            title: 'Current Search', 
+            desc: 'To check current balance and update active records', 
+            icon: <AssessmentIcon sx={{ fontSize: 24, color: '#1e293b' }} />, 
+            path: '/balance-compare/current' 
+        }
+    ];
+
+    return (
+        <Box sx={{ 
+            minHeight: '100vh', 
+            background: 'linear-gradient(180deg, #E6E6FA 0%, #FFFFFF 100%)', // तुमच्या फोटोमधील लाइट पर्पल शेड
+            pt: 10,
+            pb: 5
+        }}>
+            <Container maxWidth="lg">
+                <Box sx={{ textAlign: 'center', mb: 8 }}>
+                    <Typography variant="h5" sx={{ fontWeight: 700, color: '#1e293b', mb: 2 }}>
+                        Balance Compare Difference
+                    </Typography>
+                    <Typography variant="body2" sx={{ color: '#64748b', maxWidth: '700px', mx: 'auto', lineHeight: 1.6 }}>
+                        To View Balance details, To efficiently review and process the pending requests for 
+                        balance master, To edit update balances and to check pending balance update requests.
+                    </Typography>
+                </Box>
+
+                <Grid container spacing={3} justifyContent="center">
+                    {options.map((option) => (
+                        <Grid item xs={12} md={4} key={option.id}>
+                            <Paper
+                                elevation={0}
+                                onClick={() => navigate(option.path)}
+                                sx={{
+                                    p: 4,
+                                    height: '140px',
+                                    display: 'flex',
+                                    alignItems: 'center',
+                                    borderRadius: '24px',
+                                    border: '1px solid rgba(255, 255, 255, 0.3)',
+                                    background: 'rgba(255, 255, 255, 0.7)',
+                                    backdropFilter: 'blur(10px)',
+                                    cursor: 'pointer',
+                                    transition: 'all 0.3s ease',
+                                    '&:hover': {
+                                        transform: 'translateY(-5px)',
+                                        boxShadow: '0 10px 30px rgba(0,0,0,0.05)',
+                                        background: '#ffffff',
+                                    }
+                                }}
+                            >
+                                <Stack direction="row" spacing={2} alignItems="center" sx={{ width: '100%' }}>
+                                    <Box sx={{ 
+                                        p: 1.5, 
+                                        borderRadius: '12px', 
+                                        display: 'flex', 
+                                        alignItems: 'center', 
+                                        justifyContent: 'center' 
+                                    }}>
+                                        {option.icon}
+                                    </Box>
+                                    
+                                    <Box sx={{ flexGrow: 1 }}>
+                                        <Typography variant="subtitle1" sx={{ fontWeight: 700, color: '#1e293b', fontSize: '15px' }}>
+                                            {option.title}
+                                        </Typography>
+                                        <Typography variant="caption" sx={{ color: '#64748b', display: 'block', mt: 0.5, lineHeight: 1.3 }}>
+                                            {option.desc}
+                                        </Typography>
+                                    </Box>
+
+                                    <ChevronRightIcon sx={{ color: '#94a3b8', fontSize: '20px' }} />
+                                </Stack>
+                            </Paper>
+                        </Grid>
+                    ))}
+                </Grid>
+
+                {/* खालचा इन्फो मेसेज (तुमच्या फोटोप्रमाणे) */}
+                <Box sx={{ 
+                    mt: 8, 
+                    display: 'flex', 
+                    justifyContent: 'center', 
+                    alignItems: 'center',
+                    gap: 1,
+                    background: 'rgba(255, 255, 255, 0.5)',
+                    py: 1.5,
+                    px: 3,
+                    borderRadius: '50px',
+                    width: 'fit-content',
+                    mx: 'auto'
+                }}>
+                    <InfoOutlinedIcon sx={{ fontSize: '16px', color: '#64748b' }} />
+                    <Typography variant="caption" sx={{ color: '#64748b', fontWeight: 500 }}>
+                        Click on any of the above options to access the corresponding Balance Management features.
+                    </Typography>
+                </Box>
+            </Container>
+        </Box>
+    );
+};
+
+export default BalanceCompareDifferenceScreen;
