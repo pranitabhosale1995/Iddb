@@ -1,0 +1,171 @@
+import React, { useState, useEffect } from 'react';
+import { 
+  TextField, Button, Box, Container, Paper, 
+  Typography, Modal, IconButton 
+} from '@mui/material';
+import { DataGrid } from '@mui/x-data-grid';
+import HistoryIcon from '@mui/icons-material/History';
+import axios from 'axios';
+
+// Modal style for History Popup
+const modalStyle = {
+  position: 'absolute',
+  top: '50%',
+  left: '50%',
+  transform: 'translate(-50%, -50%)',
+  width: 600,
+  bgcolor: 'background.paper',
+  boxShadow: 24,
+  p: 4,
+  borderRadius: 2,
+};
+
+const FincoreReconTable = () => {
+  const [rows, setRows] = useState([]);
+  const [loading, setLoading] = useState(false);
+  const [selectedDate, setSelectedDate] = useState('');
+  const [totalElements, setTotalElements] = useState(0);
+  const [paginationModel, setPaginationModel] = useState({ page: 0, pageSize: 100 });
+
+  // History Popup States
+  const [open, setOpen] = useState(false);
+  const [selectedHistory, setSelectedHistory] = useState(null);
+
+  const handleOpenHistory = (rowData) => {
+    setSelectedHistory(rowData);
+    setOpen(true);
+  };
+
+  const handleClose = () => setOpen(false);
+
+  useEffect(() => {
+    const fetchInitialConfig = async () => {
+      try {
+        const response = await axios.get('/api/fincoredate'); 
+        const defaultDate = response.data.date; 
+        setSelectedDate(defaultDate);
+        fetchTableData(defaultDate, 0);
+      } catch (error) {
+        console.error("Error fetching initial date:", error);
+      }
+    };
+    fetchInitialConfig();
+  }, []);
+
+  const fetchTableData = async (date, pageIndex) => {
+    if (!date) return;
+    setLoading(true);
+    try {
+      const payload = {
+        fromDate: date,
+        toDate: date,
+        branchCode: "01063",
+        currency: "INR",
+        cgl: "2028070699"
+      };
+      const response = await axios.post(
+        `http://localhost:9005/api/differences/search?page=${pageIndex}&size=100`,
+        payload
+      );
+
+      const formattedRows = response.data.content.map((item, index) => ({
+        id: `${pageIndex}-${index}`,
+        // GLCC: Combination of Branch Code, Currency, and CGL
+        glcc: `${item.branchCode}-${item.currency}-${item.cgl}`,
+        ...item
+      }));
+
+      setRows(formattedRows);
+      setTotalElements(response.data.totalElements);
+    } catch (error) {
+      console.error("Error fetching data:", error);
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  useEffect(() => {
+    if (selectedDate) fetchTableData(selectedDate, paginationModel.page);
+  }, [paginationModel.page]);
+
+  const columns = [
+    { field: 'first_ERROR_DATE', headerName: 'Error Date', width: 120 },
+    { field: 'glcc', headerName: 'GLCC', width: 220 },
+    { field: 'cbsBalance', headerName: 'CBS Balance', width: 130 },
+    { field: 'glBalance', headerName: 'GL Balance', width: 130 },
+    { field: 'differenceAmount', headerName: 'Difference', width: 130 },
+    { field: 'diffBwYesterday', headerName: 'Diff Yesterday', width: 150 },
+    { field: 'type', headerName: 'Type', width: 120 },
+    { field: 'head', headerName: 'Head', width: 130 },
+    {
+      field: 'action',
+      headerName: 'Action',
+      width: 100,
+      renderCell: (params) => (
+        <IconButton color="primary" onClick={() => handleOpenHistory(params.row)}>
+          <HistoryIcon />
+        </IconButton>
+      ),
+    },
+  ];
+
+  return (
+    <Container maxWidth="xl" sx={{ mt: 4 }}>
+      <Typography variant="h5" sx={{ mb: 2 }}>Fincore Reconciliation</Typography>
+      
+      <Paper sx={{ p: 3, mb: 3 }}>
+        <Box display="flex" alignItems="center" gap={2}>
+          <TextField
+            label="Filter Date"
+            type="date"
+            value={selectedDate}
+            onChange={(e) => setSelectedDate(e.target.value)}
+            InputLabelProps={{ shrink: true }}
+          />
+          <Button variant="contained" onClick={() => fetchTableData(selectedDate, 0)}>
+            Search
+          </Button>
+        </Box>
+      </Paper>
+
+      <Paper sx={{ height: 650, width: '100%' }}>
+        <DataGrid
+          rows={rows}
+          columns={columns}
+          rowCount={totalElements}
+          loading={loading}
+          paginationMode="server"
+          paginationModel={paginationModel}
+          onPaginationModelChange={setPaginationModel}
+          pageSizeOptions={[100]}
+        />
+      </Paper>
+
+      {/* History Popup Modal */}
+      <Modal open={open} onClose={handleClose}>
+        <Box sx={modalStyle}>
+          <Typography variant="h6" component="h2" sx={{ mb: 2 }}>
+            Difference History
+          </Typography>
+          {selectedHistory && (
+            <Box>
+              <Typography><b>GLCC:</b> {selectedHistory.glcc}</Typography>
+              <Typography sx={{ mt: 1 }}>
+                <b>Current Difference:</b> {selectedHistory.differenceAmount}
+              </Typography>
+              <Typography sx={{ mt: 1 }}>
+                <b>Yesterday's Difference:</b> {selectedHistory.diffBwYesterday}
+              </Typography>
+              {/* Add more details here if needed */}
+              <Box sx={{ mt: 3, display: 'flex', justifyContent: 'flex-end' }}>
+                <Button onClick={handleClose} variant="outlined">Close</Button>
+              </Box>
+            </Box>
+          )}
+        </Box>
+      </Modal>
+    </Container>
+  );
+};
+
+export default FincoreReconTable;
