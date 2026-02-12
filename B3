@@ -1,0 +1,148 @@
+import React, { useState, useCallback, useEffect } from 'react';
+import { 
+  TextField, Button, Box, Container, Paper, 
+  Typography, Modal, IconButton, Grid, Divider,
+  InputAdornment, Card, CardContent
+} from '@mui/material';
+import { DataGrid } from '@mui/x-data-grid';
+import HistoryIcon from '@mui/icons-material/History';
+import CalendarMonthIcon from '@mui/icons-material/CalendarMonth';
+import SearchIcon from '@mui/icons-material/Search';
+import CloseIcon from '@mui/icons-material/Close';
+
+const BalanceRangeSearchScreen = () => {
+  const [filters, setFilters] = useState({ fromDate: '', toDate: '', glcc: '' });
+  const [rows, setRows] = useState([]);
+  const [loading, setLoading] = useState(false);
+  const [showTable, setShowTable] = useState(false); 
+  const [totalElements, setTotalElements] = useState(0);
+  const [paginationModel, setPaginationModel] = useState({ page: 0, pageSize: 100 });
+  const [openHistory, setOpenHistory] = useState(false);
+  const [selectedRow, setSelectedRow] = useState(null);
+
+  const updateFilter = (key, value) => setFilters(prev => ({ ...prev, [key]: value }));
+
+  const fetchDifferences = useCallback(async (pageIndex) => {
+    if (!filters.fromDate || !filters.toDate) {
+      alert("Please select both From and To dates.");
+      return;
+    }
+
+    setLoading(true);
+    setShowTable(true);
+
+    const payload = {
+      fromDate: filters.fromDate,
+      toDate: filters.toDate,
+      branchCode: "", 
+      currency: "",   
+      cgl: filters.glcc || "" 
+    };
+
+    // --- DEBUGGING LOGS ---
+    console.log("DEBUG: Target URL ->", `/api/differences/search?page=${pageIndex}&size=100`);
+    console.log("DEBUG: Request Payload ->", JSON.stringify(payload, null, 2));
+
+    try {
+      const response = await callApi(`/api/differences/search?page=${pageIndex}&size=100`, payload, "POST");
+
+      console.log("DEBUG: API Full Response ->", response);
+
+      const content = response?.data?.content || response?.content || [];
+      const totalElementsCount = response?.data?.totalElements || response?.totalElements || 0;
+      
+      if (Array.isArray(content)) {
+        const mappedRows = content.map((item, index) => ({
+          id: item.id || `row-${pageIndex}-${index}`,
+          ERROR_DATE: item.first_ERROR_DATE || '-',
+          REPORT_DATE: item.reconRunDate || '-',
+          GLCC_VAL: `${item.branchCode || ''} ${item.currency || ''} ${item.cgl || ''}`,
+          CBS_BALANCE: item.cbsBalance ?? 0,
+          GL_BALANCE: item.glBalance ?? 0,
+          DIFFERENCE_AMOUNT: item.differenceAmount ?? 0,
+          DIFF_YESTERDAY: item.diffBwYesterday ?? 0,
+          TYPE_VAL: item.type || '-',
+          HEAD_VAL: item.head || '-',
+        }));
+        
+        setRows(mappedRows);
+        setTotalElements(totalElementsCount);
+      } else {
+        console.warn("DEBUG: Content is not an array. Check API structure.");
+      }
+    } catch (err) {
+      console.error("DEBUG: API Catch Error ->", err);
+      // Backend cha error message check kara
+      if (err.response) {
+        console.error("DEBUG: Backend Data Error ->", err.response.data);
+        console.error("DEBUG: Status Code ->", err.response.status);
+      }
+      setRows([]);
+    } finally {
+      setLoading(false);
+    }
+  }, [filters]);
+
+  useEffect(() => {
+    if (showTable) fetchDifferences(paginationModel.page);
+  }, [paginationModel.page]);
+
+  // UI Table Columns
+  const columns = [
+    { field: 'ERROR_DATE', headerName: 'Error Date', width: 120, headerClassName: 'table-header' },
+    { field: 'GLCC_VAL', headerName: 'GLCC', width: 220, headerClassName: 'table-header' },
+    { field: 'DIFFERENCE_AMOUNT', headerName: 'Difference', width: 140, align: 'right', headerClassName: 'table-header',
+      renderCell: (params) => (
+        <Typography sx={{ color: params.value < 0 ? 'error.main' : 'success.main', fontWeight: 700 }}>
+          {params.value.toLocaleString()}
+        </Typography>
+      )
+    },
+    { field: 'HEAD_VAL', headerName: 'Head', width: 130, headerClassName: 'table-header' },
+    {
+      field: 'action', headerName: 'Action', width: 90, headerClassName: 'table-header',
+      renderCell: (params) => (
+        <IconButton color="primary" onClick={() => { setSelectedRow(params.row); setOpenHistory(true); }}>
+          <HistoryIcon />
+        </IconButton>
+      ),
+    },
+  ];
+
+  return (
+    <Container maxWidth="xl" sx={{ mt: 4, mb: 4 }}>
+      <Typography variant="h4" sx={{ mb: 4, fontWeight: 700, color: '#1a237e' }}>Reconciliation Debugging</Typography>
+      <Card sx={{ borderRadius: 3, mb: 4, boxShadow: '0 8px 32px rgba(0,0,0,0.1)' }}>
+        <CardContent sx={{ p: 4 }}>
+          <Grid container spacing={3} alignItems="flex-end">
+            <Grid item xs={12} sm={6} md={3}>
+              <TextField fullWidth type="date" label="From Date" InputLabelProps={{ shrink: true }}
+                value={filters.fromDate} onChange={(e) => updateFilter('fromDate', e.target.value)} />
+            </Grid>
+            <Grid item xs={12} sm={6} md={3}>
+              <TextField fullWidth type="date" label="To Date" InputLabelProps={{ shrink: true }}
+                value={filters.toDate} onChange={(e) => updateFilter('toDate', e.target.value)} />
+            </Grid>
+            <Grid item xs={12} md={4}>
+              <TextField fullWidth label="CGL Search" placeholder="Enter CGL..."
+                value={filters.glcc} onChange={(e) => updateFilter('glcc', e.target.value)} />
+            </Grid>
+            <Grid item xs={12} md={2}>
+              <Button fullWidth variant="contained" onClick={() => fetchDifferences(0)}>Search</Button>
+            </Grid>
+          </Grid>
+        </CardContent>
+      </Card>
+
+      {showTable && (
+        <Paper sx={{ height: 500, width: '100%', borderRadius: 4, overflow: 'hidden' }}>
+          <DataGrid rows={rows} columns={columns} rowCount={totalElements} loading={loading}
+            paginationMode="server" paginationModel={paginationModel} onPaginationModelChange={setPaginationModel}
+            pageSizeOptions={[100]} />
+        </Paper>
+      )}
+    </Container>
+  );
+};
+
+export default BalanceRangeSearchScreen;
