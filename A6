@@ -1,0 +1,185 @@
+import React, { useState, useCallback, useEffect } from 'react';
+import { 
+  TextField, Button, Box, Container, Paper, 
+  Typography, Modal, IconButton, Grid 
+} from '@mui/material';
+import { DataGrid } from '@mui/x-data-grid';
+import HistoryIcon from '@mui/icons-material/History';
+
+const modalStyle = {
+  position: 'absolute', top: '50%', left: '50%', transform: 'translate(-50%, -50%)',
+  width: 500, bgcolor: 'background.paper', boxShadow: 24, p: 4, borderRadius: 2,
+};
+
+const BalanceRangeSearchScreen = () => {
+  const [filters, setFilters] = useState({
+    fromDate: '',
+    toDate: '',
+    branchCode: '',
+    currency: '',
+    cgl: ''
+  });
+
+  const [rows, setRows] = useState([]);
+  const [loading, setLoading] = useState(false);
+  const [showTable, setShowTable] = useState(false); 
+  const [totalElements, setTotalElements] = useState(0);
+  const [paginationModel, setPaginationModel] = useState({ page: 0, pageSize: 100 });
+
+  const [openHistory, setOpenHistory] = useState(false);
+  const [selectedRow, setSelectedRow] = useState(null);
+
+  const updateFilter = (key, value) => setFilters(prev => ({ ...prev, [key]: value }));
+
+  const fetchDifferences = useCallback(async (pageIndex) => {
+    if (!filters.fromDate || !filters.toDate) {
+      alert("Please select both From and To dates.");
+      return;
+    }
+
+    setLoading(true);
+    setShowTable(true);
+
+    const payload = {
+      fromDate: filters.fromDate,
+      toDate: filters.toDate,
+      branchCode: filters.branchCode,
+      currency: filters.currency,
+      cgl: filters.cgl
+    };
+
+    try {
+      const response = await callApi('/RS/differences', {
+        params: { 
+          page: pageIndex, 
+          size: 100, 
+          ...payload 
+        }
+      }, "GET");
+
+      const content = response?.data?.content || response?.content || [];
+      const totalElementsCount = response?.data?.totalElements || response?.totalElements || 0;
+      
+      if (Array.isArray(content)) {
+        const mappedRows = content.map((item, index) => ({
+          id: item.id || `row-${pageIndex}-${index}`,
+          ERROR_DATE: item.first_ERROR_DATE || '-',
+          REPORT_DATE: item.reconRunDate || '-',
+          GLCC_VAL: `${item.branchCode || ''} ${item.currency || ''} ${item.cgl || ''}`,
+          CBS_BALANCE: item.cbsBalance ?? 0,
+          GL_BALANCE: item.glBalance ?? 0,
+          DIFFERENCE_AMOUNT: item.differenceAmount ?? 0,
+          DIFF_YESTERDAY: item.diffBwYesterday ?? 0,
+          TYPE_VAL: item.type || '-',
+          HEAD_VAL: item.head || '-',
+        }));
+        
+        setRows(mappedRows);
+        setTotalElements(totalElementsCount);
+      }
+    } catch (err) {
+      console.error(err);
+      setRows([]);
+    } finally {
+      setLoading(false);
+    }
+  }, [filters, paginationModel.pageSize]);
+
+  useEffect(() => {
+    if (showTable) {
+      fetchDifferences(paginationModel.page);
+    }
+  }, [paginationModel.page, fetchDifferences, showTable]);
+
+  const columns = [
+    { field: 'ERROR_DATE', headerName: 'Error Date', width: 120 },
+    { field: 'GLCC_VAL', headerName: 'GLCC', width: 220 },
+    { field: 'CBS_BALANCE', headerName: 'CBS Balance', width: 130 },
+    { field: 'GL_BALANCE', headerName: 'GL Balance', width: 130 },
+    { field: 'DIFFERENCE_AMOUNT', headerName: 'Difference', width: 130 },
+    { field: 'DIFF_YESTERDAY', headerName: 'Yesterday Diff', width: 150 },
+    { field: 'TYPE_VAL', headerName: 'Type', width: 120 },
+    { field: 'HEAD_VAL', headerName: 'Head', width: 130 },
+    {
+      field: 'action',
+      headerName: 'Action',
+      width: 100,
+      renderCell: (params) => (
+        <IconButton color="primary" onClick={() => { setSelectedRow(params.row); setOpenHistory(true); }}>
+          <HistoryIcon />
+        </IconButton>
+      ),
+    },
+  ];
+
+  return (
+    <Container maxWidth="xl" sx={{ mt: 4 }}>
+      <Typography variant="h5" sx={{ mb: 3 }}>Difference Range Search</Typography>
+
+      <Paper sx={{ p: 3, mb: 3 }}>
+        <Grid container spacing={2}>
+          <Grid item xs={6} md={3}>
+            <TextField fullWidth label="From Date" type="date" InputLabelProps={{ shrink: true }}
+              value={filters.fromDate} onChange={(e) => updateFilter('fromDate', e.target.value)} />
+          </Grid>
+          <Grid item xs={6} md={3}>
+            <TextField fullWidth label="To Date" type="date" InputLabelProps={{ shrink: true }}
+              value={filters.toDate} onChange={(e) => updateFilter('toDate', e.target.value)} />
+          </Grid>
+          <Grid item xs={4} md={2}>
+            <TextField fullWidth label="Branch Code" value={filters.branchCode} onChange={(e) => updateFilter('branchCode', e.target.value)} />
+          </Grid>
+          <Grid item xs={4} md={2}>
+            <TextField fullWidth label="Currency" value={filters.currency} onChange={(e) => updateFilter('currency', e.target.value)} />
+          </Grid>
+          <Grid item xs={4} md={2}>
+            <TextField fullWidth label="CGL" value={filters.cgl} onChange={(e) => updateFilter('cgl', e.target.value)} />
+          </Grid>
+          <Grid item xs={12}>
+            <Button fullWidth variant="contained" size="large" 
+              onClick={() => { 
+                setPaginationModel({ page: 0, pageSize: 100 }); 
+                fetchDifferences(0); 
+              }}>
+              Search
+            </Button>
+          </Grid>
+        </Grid>
+      </Paper>
+
+      {showTable && (
+        <Paper sx={{ height: 600, width: '100%' }}>
+          <DataGrid
+            rows={rows}
+            columns={columns}
+            rowCount={totalElements}
+            loading={loading}
+            paginationMode="server"
+            paginationModel={paginationModel}
+            onPaginationModelChange={setPaginationModel}
+            pageSizeOptions={[100]}
+            disableSelectionOnClick
+          />
+        </Paper>
+      )}
+
+      <Modal open={openHistory} onClose={() => setOpenHistory(false)}>
+        <Box sx={modalStyle}>
+          <Typography variant="h6" sx={{ mb: 2 }}>Difference History</Typography>
+          {selectedRow && (
+            <Box>
+              <Typography><b>GLCC:</b> {selectedRow.GLCC_VAL}</Typography>
+              <Typography sx={{ mt: 1 }}><b>Head:</b> {selectedRow.HEAD_VAL}</Typography>
+              <Typography sx={{ mt: 1 }}><b>Type:</b> {selectedRow.TYPE_VAL}</Typography>
+              <Typography sx={{ mt: 1 }}><b>Difference:</b> {selectedRow.DIFFERENCE_AMOUNT}</Typography>
+              <Typography sx={{ mt: 1 }}><b>Yesterday Diff:</b> {selectedRow.DIFF_YESTERDAY}</Typography>
+              <Button sx={{ mt: 3 }} fullWidth variant="outlined" onClick={() => setOpenHistory(false)}>Close</Button>
+            </Box>
+          )}
+        </Box>
+      </Modal>
+    </Container>
+  );
+};
+
+export default BalanceRangeSearchScreen;
