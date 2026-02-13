@@ -1,0 +1,160 @@
+import React, { useState, useCallback, useEffect } from 'react';
+import { 
+  TextField, Button, Box, Container, Paper, 
+  Typography, Grid, InputAdornment, Card, CardContent 
+} from '@mui/material';
+import { DataGrid } from '@mui/x-data-grid';
+import CalendarMonthIcon from '@mui/icons-material/CalendarMonth';
+import SearchIcon from '@mui/icons-material/Search';
+
+const BalanceRangeSearchScreen = () => {
+  const [filters, setFilters] = useState({
+    fromDate: '',
+    toDate: '',
+    branchCode: '',
+    currency: '',
+    cgl: ''
+  });
+
+  const [rows, setRows] = useState([]);
+  const [loading, setLoading] = useState(false);
+  const [showTable, setShowTable] = useState(false); 
+  const [totalElements, setTotalElements] = useState(0);
+  const [paginationModel, setPaginationModel] = useState({ page: 0, pageSize: 100 });
+
+  const updateFilter = (key, value) => setFilters(prev => ({ ...prev, [key]: value }));
+
+  const fetchDifferences = useCallback(async (pageIndex, pageSize) => {
+    if (!filters.fromDate || !filters.toDate) {
+      alert("Please select both From and To dates.");
+      return;
+    }
+
+    setLoading(true);
+    setShowTable(true);
+
+    const payload = {
+      fromDate: filters.fromDate,
+      toDate: filters.toDate,
+      branchCode: filters.branchCode || null,
+      currency: filters.currency || null,
+      cgl: filters.cgl || null
+    };
+
+    try {
+      const response = await callApi(`/api/differences/search?page=${pageIndex}&size=${pageSize}`, payload, "POST");
+      const content = response?.data?.content || response?.content || [];
+      const totalCount = response?.data?.totalElements || response?.totalElements || 0;
+      
+      if (Array.isArray(content)) {
+        const mappedRows = content.map((item, index) => ({
+          id: item.id || `row-${pageIndex}-${index}`,
+          ERROR_DATE: item.first_ERROR_DATE || '-',
+          GLCC_VAL: `${item.branchCode || ''} ${item.currency || ''} ${item.cgl || ''}`,
+          CBS_BALANCE: item.cbsBalance ?? 0,
+          GL_BALANCE: item.glBalance ?? 0,
+          DIFFERENCE_AMOUNT: item.differenceAmount ?? 0,
+          DIFF_YESTERDAY: item.diffBwYesterday ?? 0,
+          TYPE_VAL: item.type || '-',
+          HEAD_VAL: item.head || '-',
+        }));
+        setRows(mappedRows);
+        setTotalElements(totalCount);
+      }
+    } catch (err) {
+      console.error(err);
+      setRows([]);
+    } finally {
+      setLoading(false);
+    }
+  }, [filters]);
+
+  useEffect(() => {
+    if (showTable) {
+      fetchDifferences(paginationModel.page, paginationModel.pageSize);
+    }
+  }, [paginationModel.page, paginationModel.pageSize, fetchDifferences, showTable]);
+
+  const columns = [
+    { field: 'ERROR_DATE', headerName: 'Error Date', width: 120 },
+    { field: 'GLCC_VAL', headerName: 'GLCC', width: 220 },
+    { field: 'CBS_BALANCE', headerName: 'CBS Balance', width: 130, align: 'right' },
+    { field: 'GL_BALANCE', headerName: 'GL Balance', width: 130, align: 'right' },
+    { 
+      field: 'DIFFERENCE_AMOUNT', 
+      headerName: 'Difference Amount', 
+      width: 160, 
+      align: 'right',
+      renderCell: (params) => (
+        <Typography sx={{ color: params.value < 0 ? 'error.main' : 'success.main', fontWeight: 700 }}>
+          {params.value.toLocaleString()}
+        </Typography>
+      )
+    },
+    { field: 'DIFF_YESTERDAY', headerName: 'Difference Yesterday', width: 180, align: 'right' },
+    { field: 'TYPE_VAL', headerName: 'Type', width: 120 },
+    { field: 'HEAD_VAL', headerName: 'Head', width: 130 }
+  ];
+
+  return (
+    <Container maxWidth="xl" sx={{ mt: 4, mb: 4 }}>
+      <Typography variant="h5" sx={{ mb: 3, fontWeight: 700, color: '#1a237e' }}>
+        Range Search Reconciliation
+      </Typography>
+
+      <Card sx={{ borderRadius: 3, mb: 4, boxShadow: '0 4px 20px rgba(0,0,0,0.08)' }}>
+        <CardContent sx={{ p: 3 }}>
+          <Grid container spacing={2}>
+            <Grid item xs={12} sm={6} md={2.4}>
+              <TextField fullWidth label="From Date" type="date" size="small" value={filters.fromDate}
+                onChange={(e) => updateFilter('fromDate', e.target.value)} InputLabelProps={{ shrink: true }}
+                InputProps={{ startAdornment: <InputAdornment position="start"><CalendarMonthIcon /></InputAdornment> }} />
+            </Grid>
+            <Grid item xs={12} sm={6} md={2.4}>
+              <TextField fullWidth label="To Date" type="date" size="small" value={filters.toDate}
+                onChange={(e) => updateFilter('toDate', e.target.value)} InputLabelProps={{ shrink: true }}
+                InputProps={{ startAdornment: <InputAdornment position="start"><CalendarMonthIcon /></InputAdornment> }} />
+            </Grid>
+            <Grid item xs={12} sm={4} md={2}>
+              <TextField fullWidth label="Branch Code" size="small" value={filters.branchCode}
+                onChange={(e) => updateFilter('branchCode', e.target.value)} />
+            </Grid>
+            <Grid item xs={12} sm={4} md={2}>
+              <TextField fullWidth label="Currency" size="small" value={filters.currency}
+                onChange={(e) => updateFilter('currency', e.target.value)} />
+            </Grid>
+            <Grid item xs={12} sm={4} md={3.2}>
+              <TextField fullWidth label="CGL" size="small" value={filters.cgl}
+                onChange={(e) => updateFilter('cgl', e.target.value)}
+                InputProps={{ startAdornment: <InputAdornment position="start"><SearchIcon /></InputAdornment> }} />
+            </Grid>
+            <Grid item xs={12}>
+              <Button fullWidth variant="contained" onClick={() => { setPaginationModel({ page: 0, pageSize: 100 }); fetchDifferences(0, 100); }}
+                sx={{ height: 40, borderRadius: 2, textTransform: 'none', fontWeight: 600 }}>
+                Search Data
+              </Button>
+            </Grid>
+          </Grid>
+        </CardContent>
+      </Card>
+
+      {showTable && (
+        <Paper sx={{ height: 600, width: '100%', borderRadius: 3, overflow: 'hidden' }}>
+          <DataGrid 
+            rows={rows} 
+            columns={columns} 
+            rowCount={totalElements} 
+            loading={loading}
+            paginationMode="server" 
+            paginationModel={paginationModel} 
+            onPaginationModelChange={setPaginationModel}
+            pageSizeOptions={[10, 25, 50, 100]} 
+            disableSelectionOnClick 
+          />
+        </Paper>
+      )}
+    </Container>
+  );
+};
+
+export default BalanceRangeSearchScreen;
