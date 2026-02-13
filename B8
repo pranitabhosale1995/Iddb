@@ -1,0 +1,210 @@
+import React, { useState, useCallback, useEffect } from 'react';
+import { 
+  TextField, Button, Box, Container, Paper, 
+  Typography, Modal, IconButton, Grid, InputAdornment, Card, CardContent, Divider 
+} from '@mui/material';
+import { DataGrid } from '@mui/x-data-grid';
+import HistoryIcon from '@mui/icons-material/History';
+import CalendarMonthIcon from '@mui/icons-material/CalendarMonth';
+import SearchIcon from '@mui/icons-material/Search';
+import CloseIcon from '@mui/icons-material/Close';
+import InfoOutlinedIcon from '@mui/icons-material/InfoOutlined';
+
+const modalStyle = {
+  position: 'absolute', top: '50%', left: '50%', transform: 'translate(-50%, -50%)',
+  width: 500, bgcolor: 'background.paper', borderRadius: 4, overflow: 'hidden',
+  boxShadow: '0 20px 60px rgba(0,0,0,0.15)', border: 'none'
+};
+
+const BalanceParticularSearchScreen = () => {
+  const [filters, setFilters] = useState({
+    date: '',
+    branchCode: '01063',
+    currency: 'INR',
+    cgl: ''
+  });
+
+  const [rows, setRows] = useState([]);
+  const [loading, setLoading] = useState(false);
+  const [totalElements, setTotalElements] = useState(0);
+  const [paginationModel, setPaginationModel] = useState({ page: 0, pageSize: 10 });
+  const [openHistory, setOpenHistory] = useState(false);
+  const [selectedRow, setSelectedRow] = useState(null);
+
+  const updateFilter = (key, value) => setFilters(prev => ({ ...prev, [key]: value }));
+
+  // 1. Fetch Default ETL Date on Load
+  useEffect(() => {
+    const fetchETLDate = async () => {
+      try {
+        const res = await callApi('/api/fincoredate', {}, "GET");
+        const etlDate = res?.date || res?.data?.date || '';
+        if (etlDate) {
+          updateFilter('date', etlDate);
+          fetchData(etlDate, 0, 10);
+        }
+      } catch (err) { console.error("ETL Date Fetch Error:", err); }
+    };
+    fetchETLDate();
+  }, []);
+
+  // 2. Main Search Function
+  const fetchData = useCallback(async (date, pageIndex, pageSize) => {
+    if (!date) return;
+    setLoading(true);
+
+    const payload = {
+      fromDate: date,
+      toDate: date,
+      branchCode: filters.branchCode || null,
+      currency: filters.currency || null,
+      cgl: filters.cgl || null
+    };
+
+    try {
+      const response = await callApi(`/api/differences/search?page=${pageIndex}&size=${pageSize}`, payload, "POST");
+      const content = response?.data?.content || response?.content || [];
+      
+      if (Array.isArray(content)) {
+        const mappedRows = content.map((item, index) => ({
+          id: item.id || `row-${index}`,
+          ERROR_DATE: item.first_ERROR_DATE || '-',
+          GLCC_VAL: `${item.branchCode || ''} ${item.currency || ''} ${item.cgl || ''}`,
+          CBS_BALANCE: item.cbsBalance ?? 0,
+          GL_BALANCE: item.glBalance ?? 0,
+          DIFFERENCE_AMOUNT: item.differenceAmount ?? 0,
+          DIFF_YESTERDAY: item.diffBwYesterday ?? 0,
+          TYPE_VAL: item.type || '-',
+          HEAD_VAL: item.head || '-',
+        }));
+        setRows(mappedRows);
+        setTotalElements(response?.data?.totalElements || response?.totalElements || 0);
+      }
+    } catch (err) {
+      console.error(err);
+      setRows([]);
+    } finally { setLoading(false); }
+  }, [filters]);
+
+  useEffect(() => {
+    if (filters.date) {
+      fetchData(filters.date, paginationModel.page, paginationModel.pageSize);
+    }
+  }, [paginationModel.page, paginationModel.pageSize]);
+
+  const columns = [
+    { field: 'ERROR_DATE', headerName: 'Error Date', width: 120 },
+    { field: 'GLCC_VAL', headerName: 'GLCC', width: 220 },
+    { field: 'CBS_BALANCE', headerName: 'CBS Balance', width: 130, align: 'right' },
+    { field: 'GL_BALANCE', headerName: 'GL Balance', width: 130, align: 'right' },
+    { 
+      field: 'DIFFERENCE_AMOUNT', headerName: 'Difference Amount', width: 160, align: 'right',
+      renderCell: (params) => (
+        <Typography sx={{ color: params.value < 0 ? '#d32f2f' : '#2e7d32', fontWeight: 700 }}>
+          {params.value.toLocaleString()}
+        </Typography>
+      )
+    },
+    { field: 'DIFF_YESTERDAY', headerName: 'Diff Yesterday', width: 150, align: 'right' },
+    { field: 'TYPE_VAL', headerName: 'Type', width: 110 },
+    { field: 'HEAD_VAL', headerName: 'Head', width: 130 },
+    {
+      field: 'action', headerName: 'History', width: 80, sortable: false,
+      renderCell: (params) => (
+        <IconButton color="primary" size="small" onClick={() => { setSelectedRow(params.row); setOpenHistory(true); }}>
+          <HistoryIcon fontSize="small" />
+        </IconButton>
+      ),
+    },
+  ];
+
+  return (
+    <Container maxWidth="xl" sx={{ mt: 4, mb: 4 }}>
+      <Typography variant="h5" sx={{ mb: 3, fontWeight: 800, color: '#1a237e', letterSpacing: '0.5px' }}>
+        Particular Day Search
+      </Typography>
+
+      <Card sx={{ borderRadius: 3, mb: 4, boxShadow: '0 4px 25px rgba(0,0,0,0.06)' }}>
+        <CardContent sx={{ p: 3 }}>
+          <Grid container spacing={2} alignItems="center">
+            <Grid item xs={12} sm={6} md={2.5}>
+              <TextField fullWidth label="Select Date" type="date" size="small" value={filters.date}
+                onChange={(e) => updateFilter('date', e.target.value)} InputLabelProps={{ shrink: true }}
+                InputProps={{ startAdornment: <InputAdornment position="start"><CalendarMonthIcon color="action" /></InputAdornment> }} />
+            </Grid>
+            <Grid item xs={12} sm={3} md={2}>
+              <TextField fullWidth label="Branch" size="small" value={filters.branchCode} onChange={(e) => updateFilter('branchCode', e.target.value)} />
+            </Grid>
+            <Grid item xs={12} sm={3} md={1.5}>
+              <TextField fullWidth label="Currency" size="small" value={filters.currency} onChange={(e) => updateFilter('currency', e.target.value)} />
+            </Grid>
+            <Grid item xs={12} sm={8} md={4}>
+              <TextField fullWidth label="CGL Number" size="small" placeholder="Search CGL..." value={filters.cgl}
+                onChange={(e) => updateFilter('cgl', e.target.value)}
+                InputProps={{ startAdornment: <InputAdornment position="start"><SearchIcon color="action" /></InputAdornment> }} />
+            </Grid>
+            <Grid item xs={12} sm={4} md={2}>
+              <Button fullWidth variant="contained" disableElevation onClick={() => { setPaginationModel({ ...paginationModel, page: 0 }); fetchData(filters.date, 0, paginationModel.pageSize); }}
+                sx={{ height: 40, borderRadius: 2, fontWeight: 700, bgcolor: '#1a237e', '&:hover': { bgcolor: '#0d47a1' } }}>
+                Search
+              </Button>
+            </Grid>
+          </Grid>
+        </CardContent>
+      </Card>
+
+      <Paper sx={{ height: 600, width: '100%', borderRadius: 4, overflow: 'hidden', boxShadow: '0 4px 20px rgba(0,0,0,0.05)' }}>
+        <DataGrid rows={rows} columns={columns} rowCount={totalElements} loading={loading}
+          paginationMode="server" paginationModel={paginationModel} onPaginationModelChange={setPaginationModel}
+          pageSizeOptions={[10, 25, 50, 100]} disableSelectionOnClick
+          sx={{ border: 'none', '& .MuiDataGrid-columnHeaders': { bgcolor: '#f8f9fa', borderBottom: '2px solid #eee' } }} />
+      </Paper>
+
+      {/* Modern Improved Popup */}
+      <Modal open={openHistory} onClose={() => setOpenHistory(false)} closeAfterTransition>
+        <Box sx={modalStyle}>
+          <Box sx={{ bgcolor: '#1a237e', p: 2.5, color: 'white', display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+            <Box display="flex" alignItems="center" gap={1}>
+              <InfoOutlinedIcon fontSize="small" />
+              <Typography variant="h6" sx={{ fontSize: '1.1rem', fontWeight: 600 }}>Difference Details</Typography>
+            </Box>
+            <IconButton onClick={() => setOpenHistory(false)} sx={{ color: 'white', p: 0.5 }}><CloseIcon /></IconButton>
+          </Box>
+          <Box sx={{ p: 4 }}>
+            {selectedRow && (
+              <Grid container spacing={3}>
+                <Grid item xs={12}>
+                  <Typography variant="caption" sx={{ color: 'text.secondary', fontWeight: 600, textTransform: 'uppercase' }}>GLCC Combination</Typography>
+                  <Typography variant="body1" sx={{ mt: 0.5, fontWeight: 700, color: '#333' }}>{selectedRow.GLCC_VAL}</Typography>
+                </Grid>
+                <Grid item xs={12}><Divider /></Grid>
+                <Grid item xs={6}>
+                  <Typography variant="caption" sx={{ color: 'text.secondary', fontWeight: 600 }}>CURRENT DIFF</Typography>
+                  <Typography variant="h5" sx={{ mt: 0.5, fontWeight: 800, color: selectedRow.DIFFERENCE_AMOUNT < 0 ? '#d32f2f' : '#2e7d32' }}>
+                    {selectedRow.DIFFERENCE_AMOUNT.toLocaleString()}
+                  </Typography>
+                </Grid>
+                <Grid item xs={6}>
+                  <Typography variant="caption" sx={{ color: 'text.secondary', fontWeight: 600 }}>YESTERDAY DIFF</Typography>
+                  <Typography variant="h5" sx={{ mt: 0.5, fontWeight: 800, color: '#555' }}>
+                    {selectedRow.DIFF_YESTERDAY.toLocaleString()}
+                  </Typography>
+                </Grid>
+                <Grid item xs={12}><Box sx={{ p: 2, bgcolor: '#f5f5f5', borderRadius: 2, borderLeft: '4px solid #1a237e' }}>
+                  <Typography variant="body2" sx={{ color: '#666', fontStyle: 'italic' }}>
+                    Head: <b>{selectedRow.HEAD_VAL}</b> | Type: <b>{selectedRow.TYPE_VAL}</b>
+                  </Typography>
+                </Box></Grid>
+              </Grid>
+            )}
+            <Button fullWidth variant="outlined" sx={{ mt: 4, borderRadius: 2, fontWeight: 700, color: '#1a237e', borderColor: '#1a237e', textTransform: 'none' }} onClick={() => setOpenHistory(false)}>
+              Close Details
+            </Button>
+          </Box>
+        </Box>
+      </Modal>
+    </Container>
+  );
+};
+
+export default BalanceParticularSearchScreen;
