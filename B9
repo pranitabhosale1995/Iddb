@@ -1,0 +1,70 @@
+// Modal Layout Update
+<Modal open={openHistory} onClose={() => setOpenHistory(false)} closeAfterTransition>
+  <Box sx={modalStyle}>
+    {/* Modal Header */}
+    <Box sx={{ bgcolor: '#1a237e', p: 2, color: 'white', display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+      <Box display="flex" alignItems="center" gap={1}>
+        <InfoOutlinedIcon fontSize="small" />
+        <Typography variant="h6" sx={{ fontSize: '1.1rem', fontWeight: 600 }}>Difference Details</Typography>
+      </Box>
+      <IconButton onClick={() => setOpenHistory(false)} sx={{ color: 'white', p: 0.5 }}><CloseIcon /></IconButton>
+    </Box>
+
+    {/* Modal Content */}
+    <Box sx={{ p: 4 }}>
+      {selectedRow && (
+        <Grid container spacing={3}>
+          {/* GLCC Combination Section */}
+          <Grid item xs={12}>
+            <Typography variant="caption" sx={{ color: 'text.secondary', fontWeight: 600, textTransform: 'uppercase', display: 'block' }}>
+              GLCC Combination
+            </Typography>
+            <Typography variant="body1" sx={{ mt: 0.5, fontWeight: 700, color: '#333' }}>
+              {selectedRow.GLCC_VAL}
+            </Typography>
+          </Grid>
+
+          <Grid item xs={12}><Divider /></Grid>
+
+          {/* Current vs Yesterday Difference */}
+          <Grid item xs={6}>
+            <Typography variant="caption" sx={{ color: 'text.secondary', fontWeight: 600, display: 'block' }}>
+              CURRENT DIFF
+            </Typography>
+            <Typography variant="h5" sx={{ mt: 0.5, fontWeight: 800, color: selectedRow.DIFFERENCE_AMOUNT < 0 ? '#d32f2f' : '#2e7d32' }}>
+              {selectedRow.DIFFERENCE_AMOUNT?.toLocaleString()}
+            </Typography>
+          </Grid>
+
+          <Grid item xs={6}>
+            <Typography variant="caption" sx={{ color: 'text.secondary', fontWeight: 600, display: 'block' }}>
+              YESTERDAY DIFF
+            </Typography>
+            <Typography variant="h5" sx={{ mt: 0.5, fontWeight: 800, color: '#555' }}>
+              {selectedRow.DIFF_YESTERDAY?.toLocaleString()}
+            </Typography>
+          </Grid>
+
+          {/* Additional Info Box */}
+          <Grid item xs={12}>
+            <Box sx={{ p: 2, bgcolor: '#f5f5f5', borderRadius: 2, borderLeft: '4px solid #1a237e' }}>
+              <Typography variant="body2" sx={{ color: '#666' }}>
+                Head: <b>{selectedRow.HEAD_VAL}</b> | Type: <b>{selectedRow.TYPE_VAL}</b>
+              </Typography>
+            </Box>
+          </Grid>
+        </Grid>
+      )}
+
+      {/* Action Button */}
+      <Button 
+        fullWidth 
+        variant="contained" 
+        sx={{ mt: 4, borderRadius: 2, fontWeight: 700, bgcolor: '#1a237e', textTransform: 'none' }} 
+        onClick={() => setOpenHistory(false)}
+      >
+        Close Details
+      </Button>
+    </Box>
+  </Box>
+</Modal>
